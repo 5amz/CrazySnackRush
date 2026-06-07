@@ -288,6 +288,143 @@ class Huevo(Ingrediente):
     def __init__(self):
         super().__init__("Huevo", [("sarten", 3*FPS, 2*FPS)])
 
+class PlatoPreparado(Ingrediente):
+    def __init__(self, nombre):
+        super().__init__(nombre, [("entrega", 0, 0)])
+        self.estado = "preparado"
+
+#Clase para recetas
+class Receta:
+    def __init__(self, nombre, ingredientes, puntos, tiempo):
+        self.nombre = nombre
+        self.ingredientes = ingredientes
+        self.puntos = puntos
+        self.tiempo_limite = tiempo
+
+    def verificar(self, ingredientes):
+        if len(ingredientes) != len(self.ingredientes):
+            return False
+        
+        disponibles = list(ingredientes)
+
+        for nom in self.ingredientes:
+            encontrado = False
+            for i, ing in enumerate(disponibles):
+                if ing.nombre == nom and ing.estado == "preparado":
+                    disponibles.pop(i)
+                    encontrado = True
+                    break
+            if not encontrado:
+                return False
+        return True
+
+#Nivel 1
+receta_papas = Receta("Papas Fritas", ["Papa"], 15, 40)
+receta_dumpling = Receta("Dumplings",    ["Dumpling"], 10, 30)
+
+#Nivel 2
+receta_chopsuey = Receta("Chop Suey", ["Fideos", "Vegetal", "Carne"], 25, 60)
+
+#Nivel 3
+receta_cantones = Receta("Arroz Cantones", ["Arroz", "Huevo", "Vegetal", "Carne"], 40, 90)
+
+#Clase para estaciones de trabajo
+class Estacion:
+    def __init__(self, tipo, ingredientes_aceptados=None):
+        self.tipo = tipo  # dispensador, tabla, olla, sarten, freidora, wok, entrega
+        self.ocupada = False
+        self.ingrediente = None
+        self.ingredientes_aceptados = ingredientes_aceptados
+
+    def actualizar(self):
+        if self.ingrediente:
+            self.ingrediente.actualizar()
+
+    def interactuar(self, chef):
+        pass
+
+#Estaciones 
+class Dispensador(Estacion):
+    def __init__(self, tipo_ingrediente):
+        super().__init__("dispensador")
+        self.tipo_ingrediente = tipo_ingrediente
+
+    def interactuar(self, chef):
+        if chef.mano is None:
+            chef.mano = self.tipo_ingrediente()
+
+class Tabla(Estacion):
+    def __init__(self, ingredientes_aceptados):
+        super().__init__("tabla", ingredientes_aceptados)
+
+    def interactuar(self, chef):
+        if chef.mano is None:
+            return
+        ing = chef.mano
+        if ing.nombre in self.ingredientes_aceptados and ing.estacion_actual == self.tipo:
+            ing.actualizar()
+
+class EstacionTrabajo(Estacion):
+    def __init__(self, tipo, ingredientes_aceptados):
+        super().__init__(tipo, ingredientes_aceptados)
+
+    def interactuar(self, chef):
+        if chef.mano is not None: #Dejar ingrediente
+            ing = chef.mano
+            if ing.nombre in self.ingredientes_aceptados and ing.estacion_actual == self.tipo and self.ingrediente is None:
+                self.ingrediente = ing
+                self.ocupada = True
+                chef.mano = None
+
+        else: #Recoger ingrediente
+            if self.ingrediente and self.ingrediente.estado == "preparado" and chef.mano is None:
+                chef.mano = self.ingrediente
+                self.ingrediente = None
+                self.ocupada = False
+
+class Wok(Estacion):
+    def __init__(self, ingredientes_aceptados):
+        super().__init__("wok", ingredientes_aceptados)
+        self.ingredientes_dentro = []
+        self.resultado = None
+
+    def interactuar(self, chef):
+        if self.resultado and chef.mano is None: #Recoger cantones
+            chef.mano = self.resultado
+            self.resultado = None
+            self.ingredientes_dentro = []
+            return
+
+        if chef.mano is not None: #Dejar ingrediente compatible
+            if self.resultado is not None: #No se puede agregar mas ingredientes si ya esta listo
+                return
+            ing = chef.mano
+            nombres_dentro = [i.nombre for i in self.ingredientes_dentro]
+            if ing.nombre in self.ingredientes_aceptados and ing.estado == "preparado" and ing.nombre not in nombres_dentro:
+                self.ingredientes_dentro.append(ing)
+                chef.mano = None
+                if len(self.ingredientes_dentro) == len(self.ingredientes_aceptados): #Ver si ya estan todos
+                    self.resultado = PlatoPreparado("Cantones")
+
+class Entrega(Estacion):
+    def __init__(self, recetas):
+        super().__init__("entrega")
+        self.plato = []
+        self.recetas = recetas
+
+    def interactuar(self, chef):
+        if chef.mano is not None and chef.mano.estado == "preparado":
+            self.plato.append(chef.mano)
+            chef.mano = None
+        elif chef.mano is None:
+            for receta in self.recetas:
+                if receta.verificar(self.plato):
+                    self.plato = []
+                    return receta.puntos
+            self.plato = []
+            return 0
+        
+
 #Ciclo main
 def main():
     pygame.init()

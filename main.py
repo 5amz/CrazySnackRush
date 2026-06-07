@@ -221,6 +221,73 @@ class Menu:
         y = rect[1] + rect[3]//2 - surf.get_height()//2
         self.screen.blit(surf, (x, y))
 
+#Clase para ingredientes
+class Ingrediente:
+    def __init__(self, name, pasos, estado = "crudo"):
+        self.nombre = name
+        self.pasos = pasos
+        self.paso_actual = 0
+        self.estado = estado  # "crudo", "preparado", "quemado"
+        self.tiempo_prep = 0
+
+    @property
+    def estacion_actual(self):
+        return self.pasos[self.paso_actual][0]
+
+    @property
+    def min_prep(self):
+        return self.pasos[self.paso_actual][1]
+
+    @property
+    def max_prep(self):
+        return self.pasos[self.paso_actual][2]
+
+    def actualizar(self):
+        if self.estado == "quemado":
+            return
+        self.tiempo_prep += 1
+
+        if self.estado == "crudo" and self.tiempo_prep >= self.min_prep:
+            if self.paso_actual < len(self.pasos)-1:
+                self.paso_actual += 1
+                self.tiempo_prep = 0
+            else:
+                self.estado = "preparado"
+                self.tiempo_prep = 0
+
+        elif self.estado == "preparado":
+            if self.max_prep > 0 and self.tiempo_prep >= self.max_prep:
+                self.estado = "quemado"
+
+#Subclases de ingredientes para cada ingrediente
+class Papa(Ingrediente):
+    def __init__(self):
+        super().__init__("Papa", [("tabla",    2*FPS, 0), ("freidora", 3*FPS, 3*FPS)])
+
+class Dumpling(Ingrediente):
+    def __init__(self):
+        super().__init__("Dumpling", [("olla", 3*FPS, 3*FPS)])
+
+class Fideos(Ingrediente):
+    def __init__(self):
+        super().__init__("Fideos", [("olla", 5*FPS, 3*FPS)])
+
+class Vegetal(Ingrediente):
+    def __init__(self):
+        super().__init__("Vegetal", [("tabla", 2*FPS, 0)])
+
+class Carne(Ingrediente):
+    def __init__(self):
+        super().__init__("Carne", [("sarten", 6*FPS, 4*FPS)])
+
+class Arroz(Ingrediente):
+    def __init__(self):
+        super().__init__("Arroz", [("olla", 4*FPS, 3*FPS)])
+
+class Huevo(Ingrediente):
+    def __init__(self):
+        super().__init__("Huevo", [("sarten", 3*FPS, 2*FPS)])
+
 #Ciclo main
 def main():
     pygame.init()

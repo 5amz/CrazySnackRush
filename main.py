@@ -330,8 +330,10 @@ receta_cantones = Receta("Arroz Cantones", ["Arroz", "Huevo", "Vegetal", "Carne"
 
 #Clase para estaciones de trabajo
 class Estacion:
-    def __init__(self, tipo, ingredientes_aceptados=None):
+    def __init__(self, tipo, x, y, ingredientes_aceptados=None):
         self.tipo = tipo  # dispensador, tabla, olla, sarten, freidora, wok, entrega
+        self.x = x
+        self.y = y
         self.ocupada = False
         self.ingrediente = None
         self.ingredientes_aceptados = ingredientes_aceptados
@@ -345,8 +347,8 @@ class Estacion:
 
 #Estaciones 
 class Dispensador(Estacion):
-    def __init__(self, tipo_ingrediente):
-        super().__init__("dispensador")
+    def __init__(self, x, y, tipo_ingrediente):
+        super().__init__("dispensador", x, y)
         self.tipo_ingrediente = tipo_ingrediente
 
     def interactuar(self, chef):
@@ -354,8 +356,8 @@ class Dispensador(Estacion):
             chef.mano = self.tipo_ingrediente()
 
 class Tabla(Estacion):
-    def __init__(self, ingredientes_aceptados):
-        super().__init__("tabla", ingredientes_aceptados)
+    def __init__(self, x, y, ingredientes_aceptados):
+        super().__init__("tabla", x, y, ingredientes_aceptados)
 
     def interactuar(self, chef):
         if chef.mano is None:
@@ -365,8 +367,8 @@ class Tabla(Estacion):
             ing.actualizar()
 
 class EstacionTrabajo(Estacion):
-    def __init__(self, tipo, ingredientes_aceptados):
-        super().__init__(tipo, ingredientes_aceptados)
+    def __init__(self, tipo, x, y, ingredientes_aceptados):
+        super().__init__(tipo, x, y, ingredientes_aceptados)
 
     def interactuar(self, chef):
         if chef.mano is not None: #Dejar ingrediente
@@ -377,14 +379,14 @@ class EstacionTrabajo(Estacion):
                 chef.mano = None
 
         else: #Recoger ingrediente
-            if self.ingrediente and self.ingrediente.estado == "preparado" and chef.mano is None:
+            if self.ingrediente and self.ingrediente.estado == "preparado":
                 chef.mano = self.ingrediente
                 self.ingrediente = None
                 self.ocupada = False
 
 class Wok(Estacion):
-    def __init__(self, ingredientes_aceptados):
-        super().__init__("wok", ingredientes_aceptados)
+    def __init__(self, x, y, ingredientes_aceptados):
+        super().__init__("wok", x, y, ingredientes_aceptados)
         self.ingredientes_dentro = []
         self.resultado = None
 
@@ -407,8 +409,8 @@ class Wok(Estacion):
                     self.resultado = PlatoPreparado("Cantones")
 
 class Entrega(Estacion):
-    def __init__(self, recetas):
-        super().__init__("entrega")
+    def __init__(self, x, y, recetas):
+        super().__init__("entrega", x, y)
         self.plato = []
         self.recetas = recetas
 
@@ -423,7 +425,46 @@ class Entrega(Estacion):
                     return receta.puntos
             self.plato = []
             return 0
-        
+
+#Clase para el Chef
+class Chef:
+    def __init__(self, name, dir, x, y):
+        self.nombre = name
+        self.mano = None
+        self.direccion = dir #"arriba", "abajo", "izquierda", "derecha"
+        self.x, self.y = x, y
+        self.puntos = 0
+
+    def mover(self, x, y):
+        self.x += x
+        self.y += y
+        if x == 1:
+            self.direccion = "derecha"
+        elif x == -1:
+            self.direccion = "izquierda"
+        elif y == 1:
+            self.direccion = "abajo"
+        elif y == -1:
+            self.direccion = "arriba"
+
+    def interactuar(self, estaciones):
+        deltas = {
+        "arriba": (0, -1),
+        "abajo": (0,  1),
+        "izquierda": (-1, 0),
+        "derecha": (1,  0)}
+
+        x, y = deltas[self.direccion]
+        frente_x = self.x + x
+        frente_y = self.y + y
+
+        for estacion in estaciones:
+            if estacion.x == frente_x and estacion.y == frente_y:
+                return estacion.interactuar(self)
+        return None
+
+    def agregar_puntos(self, puntos):
+        self.puntos += puntos
 
 #Ciclo main
 def main():

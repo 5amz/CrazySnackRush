@@ -1,5 +1,6 @@
 import pygame
 import sys
+import random
 
 SCREEN_W = 1280
 SCREEN_H = 720
@@ -465,6 +466,65 @@ class Chef:
 
     def agregar_puntos(self, puntos):
         self.puntos += puntos
+
+class Cocina:
+    def __init__(self, chefs, estaciones, recetas_posibles, tiempo_total):
+        self.chefs = chefs
+        self.estaciones = estaciones
+        self.recetas_posibles = recetas_posibles
+        self.recetas_activas = []
+        self.tiempo = tiempo_total * FPS
+        self.puntaje = 0
+        self.chef_activo = 0
+
+    def cambiar_chef(self):
+        self.chef_activo = 1 - self.chef_activo #Cambio entre 0 y 1
+
+    def generar_receta(self):
+        if len(self.recetas_activas) < self.max_recetas:
+            receta = random.choice(self.recetas_posibles)
+            self.recetas_activas.append({
+                "receta": receta,
+                "tiempo_restante": receta.tiempo_limite * FPS,
+                "puntos_actuales": receta.puntos,
+            })
+
+    def mover_chef(self, dx, dy):
+        chef = self.chefs[self.chef_activo]
+        nuevo_x = chef.x + dx
+        nuevo_y = chef.y + dy
+
+        #Verificar límites de la cocina, gira el chef si intenta salir
+        bloqueado = (nuevo_x, nuevo_y) in self.paredes
+        if not bloqueado:
+            for est in self.estaciones:
+                if est.x == nuevo_x and est.y == nuevo_y:
+                    bloqueado = True
+                    break
+
+        if bloqueado:
+            if dx == 1:  chef.direccion = "derecha"
+            if dx == -1: chef.direccion = "izquierda"
+            if dy == 1:  chef.direccion = "abajo"
+            if dy == -1: chef.direccion = "arriba"
+        else:
+            chef.mover(dx, dy)
+
+    def interactuar(self):
+        chef = self.chefs[self.chef_activo]
+        resultado = chef.interactuar(self.estaciones)
+        if resultado is not None:
+            self.entregar(resultado)
+
+    # ── Sumar puntos al entregar receta ───────────
+    def entregar(self, receta):
+        chef = self.chefs[self.chef_activo]
+        for r in self.recetas_activas[:]:
+            if r["receta"] is receta:
+                self.puntaje += r["puntos_actuales"]
+                chef.agregar_puntos(r["puntos_actuales"])
+                self.recetas_activas.remove(r)
+                break
 
 #Ciclo main
 def main():

@@ -477,6 +477,10 @@ class Cocina:
         self.puntaje = 0
         self.chef_activo = 0
 
+
+        #Primera receta al iniciar
+        self.generar_receta()
+
     def cambiar_chef(self):
         self.chef_activo = 1 - self.chef_activo #Cambio entre 0 y 1
 
@@ -516,7 +520,6 @@ class Cocina:
         if resultado is not None:
             self.entregar(resultado)
 
-    # ── Sumar puntos al entregar receta ───────────
     def entregar(self, receta):
         chef = self.chefs[self.chef_activo]
         for r in self.recetas_activas[:]:
@@ -525,6 +528,59 @@ class Cocina:
                 chef.agregar_puntos(r["puntos_actuales"])
                 self.recetas_activas.remove(r)
                 break
+
+    #Actualizaciones de tablero
+    def actualizar_tabla(self, teclas):
+        chef = self.chefs[self.chef_activo]
+        if not (teclas[pygame.K_e] or teclas[pygame.K_SPACE]):
+            return
+
+        movimiento = {"arriba":(0,-1), "abajo":(0,1), "izquierda":(-1,0), "derecha":(1,0)}
+        dx, dy = movimiento[chef.direccion]
+        fx, fy = chef.x + dx, chef.y + dy
+
+        for est in self.estaciones:
+            if est.x == fx and est.y == fy and isinstance(est, Tabla):
+                est.interactuar(chef)
+    
+    def update(self, teclas):
+        self.tiempo -= 1
+
+        # movimiento del chef activo
+        if teclas[pygame.K_UP] or teclas[pygame.K_w]:
+            self.mover_chef(0, -1)
+        elif teclas[pygame.K_DOWN] or teclas[pygame.K_s]:
+            self.mover_chef(0, 1)
+        elif teclas[pygame.K_LEFT] or teclas[pygame.K_a]:
+            self.mover_chef(-1, 0)
+        elif teclas[pygame.K_RIGHT] or teclas[pygame.K_d]:
+            self.mover_chef(1, 0)
+
+        # cortar en tabla si la tecla está sostenida
+        self.actualizar_tabla(teclas)
+
+        # actualizar cocción/preparación en estaciones
+        for est in self.estaciones:
+            est.actualizar()
+
+        # actualizar tiempos de recetas activas
+        for r in self.recetas_activas[:]:
+            r["tiempo_restante"] -= 1
+            if r["tiempo_restante"] <= 0:
+                r["puntos_actuales"] = r["puntos_actuales"] // 2
+                r["tiempo_restante"] = r["receta"].tiempo_limite * FPS
+                if r["puntos_actuales"] <= 0:
+                    self.puntaje = max(0, self.puntaje - r["receta"].puntos)
+                    self.recetas_activas.remove(r)
+
+        # generar recetas nuevas con el tiempo
+        self.spawn_timer += 1
+        if self.spawn_timer >= self.spawn_intervalo:
+            self.spawn_timer = 0
+            self.generar_receta()
+
+        # ¿se acabó el tiempo?
+        return self.tiempo > 0
 
 #Ciclo main
 def main():

@@ -468,7 +468,7 @@ class Chef:
         self.puntos += puntos
 
 class Cocina:
-    def __init__(self, chefs, estaciones, recetas_posibles, tiempo_total):
+    def __init__(self, chefs, estaciones, recetas_posibles, tiempo_total, paredes=None):
         self.chefs = chefs
         self.estaciones = estaciones
         self.recetas_posibles = recetas_posibles
@@ -476,7 +476,10 @@ class Cocina:
         self.tiempo = tiempo_total * FPS
         self.puntaje = 0
         self.chef_activo = 0
-
+        self.paredes = paredes or set()
+        self.spawn_timer = 0
+        self.spawn_intervalo = 8 * FPS
+        self.max_recetas = 4
 
         #Primera receta al iniciar
         self.generar_receta()
@@ -581,6 +584,74 @@ class Cocina:
 
         # ¿se acabó el tiempo?
         return self.tiempo > 0
+    
+    #Dibujar la cocina, chefs, estaciones y HUD
+    def draw(self, screen, offset_x=0, offset_y=0):
+        # estaciones
+        for est in self.estaciones:
+            self._draw_estacion(screen, est, offset_x, offset_y)
+
+        # chefs
+        for i, chef in enumerate(self.chefs):
+            self._draw_chef(screen, chef, offset_x, offset_y, activo=(i == self.chef_activo))
+
+        # HUD
+        self._draw_hud(screen)
+
+    def _draw_estacion(self, screen, est, ox, oy):
+        px = ox + est.x * TILE
+        py = oy + est.y * TILE
+        colores = {
+            "dispensador": GRIS,
+            "tabla": VERDE,
+            "olla": NARANJA,
+            "sarten": ROJO,
+            "freidora": AMARILLO,
+            "wok": AZUL,
+            "entrega": DORADO,
+        }
+        color = colores.get(est.tipo, GRIS_OSC)
+        pygame.draw.rect(screen, color, (px, py, TILE-2, TILE-2), border_radius=8)
+
+        etiqueta = F_S.render(est.tipo[:4].upper(), True, NEGRO)
+        screen.blit(etiqueta, (px + 4, py + 4))
+
+        if est.ingrediente:
+            ing_s = F_S.render(est.ingrediente.nombre[:4], True, BLANCO)
+            screen.blit(ing_s, (px + 4, py + TILE - 20))
+
+    def _draw_chef(self, screen, chef, ox, oy, activo):
+        px = ox + chef.x * TILE
+        py = oy + chef.y * TILE
+        color = AMARILLO if activo else AZUL
+        pygame.draw.circle(screen, color, (px + TILE//2, py + TILE//2), TILE//3)
+
+        nombre_s = F_S.render(chef.nombre, True, BLANCO)
+        screen.blit(nombre_s, (px, py - 18))
+
+        if chef.mano:
+            ing_s = F_S.render(chef.mano.nombre[:4], True, BLANCO)
+            screen.blit(ing_s, (px + TILE//2 - 10, py + TILE//2 - 8))
+
+    def _draw_hud(self, screen):
+        seg = max(0, self.tiempo // FPS)
+        t_s = F_L.render(f"{seg//60:02d}:{seg%60:02d}", True, BLANCO)
+        screen.blit(t_s, (20, 20))
+
+        p_s = F_L.render(f"{self.puntaje}", True, DORADO)
+        screen.blit(p_s, (SCREEN_W - p_s.get_width() - 20, 20))
+
+        for i, r in enumerate(self.recetas_activas):
+            x = 20 + i * 180
+            y = 80
+            pygame.draw.rect(screen, GRIS_OSC, (x, y, 170, 80), border_radius=10)
+            nombre_s = F_S.render(r["receta"].nombre, True, BLANCO)
+            pts_s = F_S.render(f"{r['puntos_actuales']}", True, AMARILLO)
+            seg_r = max(0, r["tiempo_restante"] // FPS)
+            t_r_s = F_S.render(f"{seg_r}s", True, GRIS)
+            screen.blit(nombre_s, (x + 8, y + 8))
+            screen.blit(pts_s, (x + 8, y + 30))
+            screen.blit(t_r_s, (x + 8, y + 52))
 
 #Ciclo main
 def main():

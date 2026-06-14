@@ -327,7 +327,7 @@ receta_dumpling = Receta("Dumplings",    ["Dumpling"], 10, 30)
 receta_chopsuey = Receta("Chop Suey", ["Fideos", "Vegetal", "Carne"], 25, 60)
 
 #Nivel 3
-receta_cantones = Receta("Arroz Cantones", ["Arroz", "Huevo", "Vegetal", "Carne"], 40, 90)
+receta_cantones = Receta("Arroz Cantones", ["Cantones"], 40, 90)
 
 #Clase para estaciones de trabajo
 class Estacion:
@@ -423,9 +423,9 @@ class Entrega(Estacion):
             for receta in self.recetas:
                 if receta.verificar(self.plato):
                     self.plato = []
-                    return receta.puntos
+                    return receta
             self.plato = []
-            return 0
+            return None
 
 #Clase para el Chef
 class Chef:
@@ -532,7 +532,7 @@ class Cocina:
                 self.recetas_activas.remove(r)
                 break
 
-    #Actualizaciones de tablero
+    #Verificar presion en tabla para cortar
     def actualizar_tabla(self, teclas):
         chef = self.chefs[self.chef_activo]
         if not (teclas[pygame.K_e] or teclas[pygame.K_SPACE]):
@@ -546,6 +546,7 @@ class Cocina:
             if est.x == fx and est.y == fy and isinstance(est, Tabla):
                 est.interactuar(chef)
     
+    #Actualizaciones de tablero
     def update(self, teclas):
         self.tiempo -= 1
 
@@ -570,7 +571,7 @@ class Cocina:
         for r in self.recetas_activas[:]:
             r["tiempo_restante"] -= 1
             if r["tiempo_restante"] <= 0:
-                r["puntos_actuales"] = r["puntos_actuales"] // 2
+                r["puntos_actuales"] = r["puntos_actuales"] // 2 #Penaliza puntaje a la mitad por no entregar
                 r["tiempo_restante"] = r["receta"].tiempo_limite * FPS
                 if r["puntos_actuales"] <= 0:
                     self.puntaje = max(0, self.puntaje - r["receta"].puntos)
@@ -589,16 +590,16 @@ class Cocina:
     def draw(self, screen, offset_x=0, offset_y=0):
         # estaciones
         for est in self.estaciones:
-            self._draw_estacion(screen, est, offset_x, offset_y)
+            self.draw_estacion(screen, est, offset_x, offset_y)
 
         # chefs
         for i, chef in enumerate(self.chefs):
-            self._draw_chef(screen, chef, offset_x, offset_y, activo=(i == self.chef_activo))
+            self.draw_chef(screen, chef, offset_x, offset_y, activo=(i == self.chef_activo))
 
         # HUD
-        self._draw_hud(screen)
+        self.draw_hud(screen)
 
-    def _draw_estacion(self, screen, est, ox, oy):
+    def draw_estacion(self, screen, est, ox, oy):
         px = ox + est.x * TILE
         py = oy + est.y * TILE
         colores = {
@@ -620,7 +621,7 @@ class Cocina:
             ing_s = F_S.render(est.ingrediente.nombre[:4], True, BLANCO)
             screen.blit(ing_s, (px + 4, py + TILE - 20))
 
-    def _draw_chef(self, screen, chef, ox, oy, activo):
+    def draw_chef(self, screen, chef, ox, oy, activo):
         px = ox + chef.x * TILE
         py = oy + chef.y * TILE
         color = AMARILLO if activo else AZUL
@@ -633,12 +634,12 @@ class Cocina:
             ing_s = F_S.render(chef.mano.nombre[:4], True, BLANCO)
             screen.blit(ing_s, (px + TILE//2 - 10, py + TILE//2 - 8))
 
-    def _draw_hud(self, screen):
+    def draw_hud(self, screen):
         seg = max(0, self.tiempo // FPS)
-        t_s = F_L.render(f"{seg//60:02d}:{seg%60:02d}", True, BLANCO)
+        t_s = F_L.render(f"{seg//60:02d}:{seg%60:02d}", True, BLANCO) #tiempo surface
         screen.blit(t_s, (20, 20))
 
-        p_s = F_L.render(f"{self.puntaje}", True, DORADO)
+        p_s = F_L.render(f"{self.puntaje}", True, DORADO) #puntaje surface
         screen.blit(p_s, (SCREEN_W - p_s.get_width() - 20, 20))
 
         for i, r in enumerate(self.recetas_activas):
@@ -652,6 +653,53 @@ class Cocina:
             screen.blit(nombre_s, (x + 8, y + 8))
             screen.blit(pts_s, (x + 8, y + 30))
             screen.blit(t_r_s, (x + 8, y + 52))
+
+#Generar paredes para niveles
+def generar_paredes(ancho, alto):
+    paredes = set()
+    for x in range(ancho):
+        paredes.add((x, 0))         # pared superior
+        paredes.add((x, alto - 1))  # pared inferior
+    for y in range(alto):
+        paredes.add((0, y))         # pared izquierda
+        paredes.add((ancho - 1, y)) # pared derecha
+    return paredes
+
+#Nivel 1
+NIVEL1_PAREDES = generar_paredes(11, 8)
+
+NIVEL1_RECETAS = [receta_papas, receta_dumpling]
+
+NIVEL1_ESTACIONES = [
+    Dispensador(2, 0, Papa),
+    Dispensador(9, 0, Dumpling),
+    Tabla(3, 7, ["Papa"]),
+    EstacionTrabajo("olla", 6, 7, ["Dumpling"]),
+    EstacionTrabajo("freidora", 8, 7, ["Papa"]),
+    Entrega(10, 3, NIVEL1_RECETAS)
+]
+
+NIVEL1_CHEFS = [
+    Chef("Pedri", "abajo", 5, 3),
+    Chef("Gavi", "abajo", 5, 4)
+]
+
+#Nivel 2
+
+
+#Nivel 3
+
+
+#Facilitar acceso
+NIVELES = [
+    {
+        "chefs": NIVEL1_CHEFS,
+        "estaciones": NIVEL1_ESTACIONES,
+        "recetas": NIVEL1_RECETAS,
+        "paredes": NIVEL1_PAREDES,
+        "tiempo": 90,
+    }
+]
 
 #Ciclo main
 def main():
@@ -683,9 +731,9 @@ def main():
                         sys.exit()
                     elif accion == "jugar":
                         nivel_elegido = dato
-                        #cocina = Cocina(nivel_elegido)
+                        config = NIVELES[nivel_elegido]
+                        cocina = Cocina(config["chefs"], config["estaciones"], config["recetas"], config["tiempo"], config["paredes"])
                         estado = "jugando"
-                        print(f" Iniciar nivel {nivel_elegido + 1}")
 
             elif estado == "jugando":
                 if event.type == pygame.KEYDOWN:
@@ -693,7 +741,10 @@ def main():
                         estado = "menu"
                     elif event.key == pygame.K_p:
                         estado = "pausa"
-                    # TAB, E/Espacio
+                    elif event.key == pygame.K_TAB:
+                        cocina.cambiar_chef()
+                    elif event.key in (pygame.K_e, pygame.K_SPACE):
+                        cocina.interactuar()
 
             elif estado == "pausa":
                 if event.type == pygame.KEYDOWN:
@@ -702,19 +753,42 @@ def main():
                     elif event.key == pygame.K_ESCAPE:
                         estado = "menu"
 
+            elif estado == "game_over":
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        estado = "menu"
+                        cocina = None
+
         #Actualizar interfaz
         if estado == "menu":
             menu.update()
         elif estado == "jugando" and cocina:
-            pass  # cocina.update(pygame.key.get_pressed())
+            sigue = cocina.update(pygame.key.get_pressed())
+            if not sigue:
+                estado = "game_over"
 
         #Dibujar interaz
         if estado == "menu":
             menu.draw()
         elif estado == "jugando" and cocina:
-            pass  # cocina.draw(screen)
+            screen.fill(NEGRO)
+            cocina.draw(screen, offset_x=64, offset_y=64)
         elif estado == "pausa" and cocina:
-            pass  # overlay pausa
+            screen.fill(NEGRO)
+            cocina.draw(screen, offset_x=64, offset_y=64)
+            overlay = pygame.Surface((SCREEN_W, SCREEN_H), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, 160))
+            screen.blit(overlay, (0, 0))
+            pausa_s = F_TITULO.render("PAUSA", True, BLANCO)
+            screen.blit(pausa_s, (SCREEN_W//2 - pausa_s.get_width()//2, SCREEN_H//2 - 40))
+        elif estado == "game_over":
+            screen.fill(NEGRO)
+            go_s = F_TITULO.render("¡TIEMPO!", True, ROJO)
+            pts_s = F_XL.render(f"Puntaje: {cocina.puntaje}", True, DORADO)
+            screen.blit(go_s, (SCREEN_W//2 - go_s.get_width()//2, 200))
+            screen.blit(pts_s, (SCREEN_W//2 - pts_s.get_width()//2, 320))
+            hint = F_M.render("Presione ESC para volver al menú", True, GRIS)
+            screen.blit(hint, (SCREEN_W//2 - hint.get_width()//2, 420))
 
         pygame.display.flip()
 

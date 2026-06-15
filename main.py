@@ -10,6 +10,7 @@ TILE = 64  # tamaño de cada celda del grid en píxeles
 # Colores
 NEGRO = (10,10,15)
 BLANCO = (240,240,240)
+CAFE = (60, 30, 30)
 GRIS = (100,100,120)
 GRIS_OSC = (40,40,55)
 ROJO = (210,70,70)
@@ -468,7 +469,7 @@ class Chef:
         self.puntos += puntos
 
 class Cocina:
-    def __init__(self, chefs, estaciones, recetas_posibles, tiempo_total, paredes=None):
+    def __init__(self, chefs, estaciones, recetas_posibles, tiempo_total, paredes=None, ancho=0, alto=0):
         self.chefs = chefs
         self.estaciones = estaciones
         self.recetas_posibles = recetas_posibles
@@ -480,6 +481,10 @@ class Cocina:
         self.spawn_timer = 0
         self.spawn_intervalo = 8 * FPS
         self.max_recetas = 4
+        self.mover_cooldown = 0
+        self.mover_delay = 8
+        self.ancho = ancho
+        self.alto = alto
 
         #Primera receta al iniciar
         self.generar_receta()
@@ -549,16 +554,26 @@ class Cocina:
     #Actualizaciones de tablero
     def update(self, teclas):
         self.tiempo -= 1
+        if self.mover_cooldown > 0:
+            self.mover_cooldown -= 1
+        else:
+            movido = False
+            # movimiento del chef activo
+            if teclas[pygame.K_UP] or teclas[pygame.K_w]:
+                self.mover_chef(0, -1)
+                movido = True
+            elif teclas[pygame.K_DOWN] or teclas[pygame.K_s]:
+                self.mover_chef(0, 1)
+                movido = True
+            elif teclas[pygame.K_LEFT] or teclas[pygame.K_a]:
+                self.mover_chef(-1, 0)
+                movido = True
+            elif teclas[pygame.K_RIGHT] or teclas[pygame.K_d]:
+                self.mover_chef(1, 0)
+                movido = True
 
-        # movimiento del chef activo
-        if teclas[pygame.K_UP] or teclas[pygame.K_w]:
-            self.mover_chef(0, -1)
-        elif teclas[pygame.K_DOWN] or teclas[pygame.K_s]:
-            self.mover_chef(0, 1)
-        elif teclas[pygame.K_LEFT] or teclas[pygame.K_a]:
-            self.mover_chef(-1, 0)
-        elif teclas[pygame.K_RIGHT] or teclas[pygame.K_d]:
-            self.mover_chef(1, 0)
+            if movido:
+                self.mover_cooldown = self.mover_delay
 
         # cortar en tabla si la tecla está sostenida
         self.actualizar_tabla(teclas)
@@ -586,8 +601,19 @@ class Cocina:
         # ¿se acabó el tiempo?
         return self.tiempo > 0
     
+    # Obtener color según estado del ingrediente
+    def color_ingrediente(self, ing):
+        if ing.estado == "preparado":
+            return VERDE
+        if ing.estado == "quemado":
+            return CAFE
+        if ing.estado == "crudo" and ing.paso_actual > 0:
+            return NARANJA
+        return BLANCO
+
     #Dibujar la cocina, chefs, estaciones y HUD
     def draw(self, screen, offset_x=0, offset_y=0):
+        self.draw_mapa(screen, offset_x, offset_y)
         # estaciones
         for est in self.estaciones:
             self.draw_estacion(screen, est, offset_x, offset_y)
@@ -598,6 +624,18 @@ class Cocina:
 
         # HUD
         self.draw_hud(screen)
+
+    def draw_mapa(self, screen, ox, oy):
+        for y in range(self.alto):
+            for x in range(self.ancho):
+                px = ox + x * TILE
+                py = oy + y * TILE
+                if (x, y) in self.paredes:
+                    color = GRIS_OSC
+                else:
+                    color = BLANCO
+                pygame.draw.rect(screen, color, (px, py, TILE, TILE))
+                pygame.draw.rect(screen, NEGRO, (px, py, TILE, TILE), 1) # borde de la celda
 
     def draw_estacion(self, screen, est, ox, oy):
         px = ox + est.x * TILE
@@ -618,7 +656,8 @@ class Cocina:
         screen.blit(etiqueta, (px + 4, py + 4))
 
         if est.ingrediente:
-            ing_s = F_S.render(est.ingrediente.nombre[:4], True, BLANCO)
+            color_estado = self.color_ingrediente(est.ingrediente)
+            ing_s = F_S.render(est.ingrediente.nombre[:4], True, color_estado)
             screen.blit(ing_s, (px + 4, py + TILE - 20))
 
     def draw_chef(self, screen, chef, ox, oy, activo):
@@ -631,7 +670,8 @@ class Cocina:
         screen.blit(nombre_s, (px, py - 18))
 
         if chef.mano:
-            ing_s = F_S.render(chef.mano.nombre[:4], True, BLANCO)
+            color_estado = self.color_ingrediente(chef.mano)
+            ing_s = F_S.render(chef.mano.nombre[:4], True, color_estado)
             screen.blit(ing_s, (px + TILE//2 - 10, py + TILE//2 - 8))
 
     def draw_hud(self, screen):
@@ -698,6 +738,8 @@ NIVELES = [
         "recetas": NIVEL1_RECETAS,
         "paredes": NIVEL1_PAREDES,
         "tiempo": 90,
+        "ancho": 11,
+        "alto": 8
     }
 ]
 
@@ -732,7 +774,8 @@ def main():
                     elif accion == "jugar":
                         nivel_elegido = dato
                         config = NIVELES[nivel_elegido]
-                        cocina = Cocina(config["chefs"], config["estaciones"], config["recetas"], config["tiempo"], config["paredes"])
+                        cocina = Cocina(config["chefs"], config["estaciones"], config["recetas"], config["tiempo"], 
+                                        config["paredes"], ancho=config["ancho"], alto=config["alto"])
                         estado = "jugando"
 
             elif estado == "jugando":

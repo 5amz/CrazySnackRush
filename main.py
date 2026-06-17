@@ -353,7 +353,7 @@ class Dispensador(Estacion):
         super().__init__("dispensador", x, y)
         self.tipo_ingrediente = tipo_ingrediente
 
-    def interactuar(self, chef):
+    def interactuar(self, chef, **args):
         if chef.mano is None:
             chef.mano = self.tipo_ingrediente()
 
@@ -361,7 +361,7 @@ class Tabla(Estacion):
     def __init__(self, x, y, ingredientes_aceptados):
         super().__init__("tabla", x, y, ingredientes_aceptados)
 
-    def interactuar(self, chef):
+    def interactuar(self, chef, **args):
         if chef.mano is None:
             return
         ing = chef.mano
@@ -372,7 +372,7 @@ class EstacionTrabajo(Estacion):
     def __init__(self, tipo, x, y, ingredientes_aceptados):
         super().__init__(tipo, x, y, ingredientes_aceptados)
 
-    def interactuar(self, chef):
+    def interactuar(self, chef, **args):
         if chef.mano is not None: #Dejar ingrediente
             ing = chef.mano
             if ing.nombre in self.ingredientes_aceptados and ing.estacion_actual == self.tipo and self.ingrediente is None:
@@ -381,7 +381,7 @@ class EstacionTrabajo(Estacion):
                 chef.mano = None
 
         else: #Recoger ingrediente
-            if self.ingrediente and self.ingrediente.estado == "preparado":
+            if self.ingrediente and self.ingrediente.estado in ("preparado", "quemado"):
                 chef.mano = self.ingrediente
                 self.ingrediente = None
                 self.ocupada = False
@@ -392,7 +392,7 @@ class Wok(Estacion):
         self.ingredientes_dentro = []
         self.resultado = None
 
-    def interactuar(self, chef):
+    def interactuar(self, chef, **args):
         if self.resultado and chef.mano is None: #Recoger cantones
             chef.mano = self.resultado
             self.resultado = None
@@ -411,22 +411,30 @@ class Wok(Estacion):
                     self.resultado = PlatoPreparado("Cantones")
 
 class Entrega(Estacion):
-    def __init__(self, x, y, recetas):
+    def __init__(self, x, y):
         super().__init__("entrega", x, y)
         self.plato = []
-        self.recetas = recetas
 
-    def interactuar(self, chef):
+    def interactuar(self, chef, recetas_activas=None,**args):
         if chef.mano is not None and chef.mano.estado == "preparado":
             self.plato.append(chef.mano)
             chef.mano = None
+            return None
         elif chef.mano is None:
-            for receta in self.recetas:
-                if receta.verificar(self.plato):
+            for receta in recetas_activas or []:
+                if receta["receta"].verificar(self.plato):
                     self.plato = []
                     return receta
             self.plato = []
             return None
+        
+class Basurero(Estacion):
+    def __init__(self, x, y):
+        super().__init__("basurero", x, y)
+
+    def interactuar(self, chef, **args):
+        if chef.mano is not None:
+            chef.mano = None
 
 #Clase para el Chef
 class Chef:
@@ -449,7 +457,7 @@ class Chef:
         elif y == -1:
             self.direccion = "arriba"
 
-    def interactuar(self, estaciones):
+    def interactuar(self, estaciones, **args):
         deltas = {
         "arriba": (0, -1),
         "abajo": (0,  1),
@@ -462,7 +470,7 @@ class Chef:
 
         for estacion in estaciones:
             if estacion.x == frente_x and estacion.y == frente_y:
-                return estacion.interactuar(self)
+                return estacion.interactuar(self, **args)
         return None
 
     def agregar_puntos(self, puntos):
@@ -524,18 +532,15 @@ class Cocina:
 
     def interactuar(self):
         chef = self.chefs[self.chef_activo]
-        resultado = chef.interactuar(self.estaciones)
+        resultado = chef.interactuar(self.estaciones, recetas_activas=self.recetas_activas)
         if resultado is not None:
             self.entregar(resultado)
 
-    def entregar(self, receta):
+    def entregar(self, r):
         chef = self.chefs[self.chef_activo]
-        for r in self.recetas_activas[:]:
-            if r["receta"] is receta:
-                self.puntaje += r["puntos_actuales"]
-                chef.agregar_puntos(r["puntos_actuales"])
-                self.recetas_activas.remove(r)
-                break
+        self.puntaje += r["puntos_actuales"]
+        chef.agregar_puntos(r["puntos_actuales"])
+        self.recetas_activas.remove(r)
 
     #Verificar presion en tabla para cortar
     def actualizar_tabla(self, teclas):
@@ -587,7 +592,7 @@ class Cocina:
             r["tiempo_restante"] -= 1
             if r["tiempo_restante"] <= 0:
                 r["puntos_actuales"] = r["puntos_actuales"] // 2 #Penaliza puntaje a la mitad por no entregar
-                r["tiempo_restante"] = r["receta"].tiempo_limite * FPS
+                r["tiempo_restante"] = max(5*FPS, r["tiempo_restante"]//2) #Agregar un poco de tiempo extra para entregar con puntaje reducido
                 if r["puntos_actuales"] <= 0:
                     self.puntaje = max(0, self.puntaje - r["receta"].puntos)
                     self.recetas_activas.remove(r)
@@ -641,18 +646,22 @@ class Cocina:
         px = ox + est.x * TILE
         py = oy + est.y * TILE
         colores = {
-            "dispensador": GRIS,
+            "dispensador": CAFE,
             "tabla": VERDE,
             "olla": NARANJA,
             "sarten": ROJO,
             "freidora": AMARILLO,
             "wok": AZUL,
             "entrega": DORADO,
+            "basurero": GRIS
         }
         color = colores.get(est.tipo, GRIS_OSC)
         pygame.draw.rect(screen, color, (px, py, TILE-2, TILE-2), border_radius=8)
 
-        etiqueta = F_S.render(est.tipo[:4].upper(), True, NEGRO)
+        if isinstance(est, Dispensador):
+            etiqueta = F_S.render(est.tipo_ingrediente.__name__[:4].upper(), True, NEGRO)
+        else:
+            etiqueta = F_S.render(est.tipo[:4].upper(), True, NEGRO)
         screen.blit(etiqueta, (px + 4, py + 4))
 
         if est.ingrediente:
@@ -666,7 +675,7 @@ class Cocina:
         color = AMARILLO if activo else AZUL
         pygame.draw.circle(screen, color, (px + TILE//2, py + TILE//2), TILE//3)
 
-        nombre_s = F_S.render(chef.nombre, True, BLANCO)
+        nombre_s = F_S.render(chef.nombre, True, NEGRO)
         screen.blit(nombre_s, (px, py - 18))
 
         if chef.mano:
@@ -716,7 +725,8 @@ NIVEL1_ESTACIONES = [
     Tabla(3, 7, ["Papa"]),
     EstacionTrabajo("olla", 6, 7, ["Dumpling"]),
     EstacionTrabajo("freidora", 8, 7, ["Papa"]),
-    Entrega(10, 3, NIVEL1_RECETAS)
+    Basurero(5, 0),
+    Entrega(10, 3)
 ]
 
 NIVEL1_CHEFS = [
@@ -725,7 +735,30 @@ NIVEL1_CHEFS = [
 ]
 
 #Nivel 2
+NIVEL2_PAREDES = generar_paredes(15, 7)
 
+NIVEL2_RECETAS = [receta_papas, receta_dumpling, receta_chopsuey]
+
+NIVEL2_ESTACIONES = [
+    Dispensador(1, 0, Papa),
+    Dispensador(4, 0, Dumpling),
+    Dispensador(7, 0, Fideos),
+    Dispensador(10, 0, Carne),
+    Dispensador(13, 0, Vegetal),
+    Tabla(1, 6, ["Papa", "Vegetal"]),
+    Tabla(4, 6, ["Papa", "Vegetal"]),
+    EstacionTrabajo("olla", 10, 6, ["Dumpling", "Fideos"]),
+    EstacionTrabajo("olla", 13, 6, ["Dumpling", "Fideos"]),
+    EstacionTrabajo("freidora", 6, 3, ["Papa"]),
+    EstacionTrabajo("sarten", 8, 3, ["Carne"]),
+    Basurero(0, 3),
+    Entrega(14, 3)
+]
+
+NIVEL2_CHEFS = [
+    Chef("Lewandoski", "abajo", 7, 2),
+    Chef("Szczesny", "abajo", 7, 4)
+]
 
 #Nivel 3
 
@@ -740,7 +773,16 @@ NIVELES = [
         "tiempo": 90,
         "ancho": 11,
         "alto": 8
-    }
+    },
+    {
+        "chefs": NIVEL2_CHEFS,
+        "estaciones": NIVEL2_ESTACIONES,
+        "recetas": NIVEL2_RECETAS,
+        "paredes": NIVEL2_PAREDES,
+        "tiempo": 120,
+        "ancho": 15,
+        "alto": 7
+    },
 ]
 
 #Ciclo main

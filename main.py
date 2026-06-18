@@ -669,6 +669,23 @@ class Cocina:
             ing_s = F_S.render(est.ingrediente.nombre[:4], True, color_estado)
             screen.blit(ing_s, (px + 4, py + TILE - 20))
 
+        if isinstance(est, Wok):
+            for i, ing in enumerate(est.ingredientes_dentro):
+                color_estado = self.color_ingrediente(ing)
+                txt = F_S.render(ing.nombre[:4], True, color_estado)
+                screen.blit(txt, (px + 2, py + 18 + i * 12))
+
+            if est.resultado:
+                txt = F_S.render("CANT", True, VERDE)
+                screen.blit(txt, (px + 2, py + TILE - 18))
+
+        # Entrega: mostrar ingredientes entregados
+        if isinstance(est, Entrega):
+            for i, ing in enumerate(est.plato):
+                color_estado = self.color_ingrediente(ing)
+                txt = F_S.render(ing.nombre[:4], True, color_estado)
+                screen.blit(txt, (px + 2, py + 18 + i * 12))
+
     def draw_chef(self, screen, chef, ox, oy, activo):
         px = ox + chef.x * TILE
         py = oy + chef.y * TILE
@@ -761,7 +778,42 @@ NIVEL2_CHEFS = [
 ]
 
 #Nivel 3
+NIVEL3_PAREDES = generar_paredes(17, 9)
+NIVEL3_PAREDES.update([(4,3), (4,5), (6,3), (6,5), (10,3), (10,5), (12,3), (12,5)])
 
+NIVEL3_RECETAS = [receta_papas, receta_dumpling, receta_chopsuey, receta_cantones]
+
+NIVEL3_ESTACIONES = [
+    Dispensador(2, 0, Papa),
+    Dispensador(4, 0, Dumpling),
+    Dispensador(6, 0, Fideos),
+    Dispensador(8, 0, Carne),
+    Dispensador(10, 0, Vegetal),
+    Dispensador(12, 0, Arroz),
+    Dispensador(14, 0, Huevo),
+    Tabla(2, 8, ["Papa", "Vegetal"]),
+    Tabla(5, 8, ["Papa", "Vegetal"]),
+    EstacionTrabajo("freidora", 0, 2, ["Papa"]),
+    EstacionTrabajo("freidora", 0, 6, ["Papa"]),
+    EstacionTrabajo("sarten", 10, 4, ["Carne", "Huevo"]),
+    EstacionTrabajo("sarten", 11, 3, ["Carne", "Huevo"]),
+    EstacionTrabajo("sarten", 11, 5, ["Carne", "Huevo"]),
+    EstacionTrabajo("sarten", 12, 4, ["Carne", "Huevo"]),
+    EstacionTrabajo("olla", 4, 4, ["Dumpling", "Fideos", "Arroz"]),
+    EstacionTrabajo("olla", 5, 3, ["Dumpling", "Fideos", "Arroz"]),
+    EstacionTrabajo("olla", 5, 5, ["Dumpling", "Fideos", "Arroz"]),
+    EstacionTrabajo("olla", 6, 4, ["Dumpling", "Fideos", "Arroz"]),
+    Wok(11, 8, ["Arroz", "Vegetal", "Carne", "Huevo"]),
+    Wok(14, 8, ["Arroz", "Vegetal", "Carne", "Huevo"]),
+    Basurero(0, 4),
+    Basurero(8, 8),
+    Entrega(16, 4)
+]
+
+NIVEL3_CHEFS = [
+    Chef("Lamine", "abajo", 8, 3),
+    Chef("Raphinha", "abajo", 8, 5)
+]
 
 #Facilitar acceso
 NIVELES = [
@@ -783,6 +835,15 @@ NIVELES = [
         "ancho": 15,
         "alto": 7
     },
+    {
+        "chefs": NIVEL3_CHEFS,
+        "estaciones": NIVEL3_ESTACIONES,
+        "recetas": NIVEL3_RECETAS,
+        "paredes": NIVEL3_PAREDES,
+        "tiempo": 150,
+        "ancho": 17,
+        "alto": 9
+    }
 ]
 
 #Ciclo main

@@ -855,6 +855,8 @@ def main():
 
     estado = "menu" # "menu", "jugando", "pausa", "game_over"
     nivel_elegido = 0
+    offset_x = 0
+    offset_y = 0
     menu = Menu(screen)
     cocina = None 
 
@@ -880,7 +882,7 @@ def main():
                         cocina = Cocina(config["chefs"], config["estaciones"], config["recetas"], config["tiempo"], 
                                         config["paredes"], ancho=config["ancho"], alto=config["alto"])
                         estado = "jugando"
-
+            
             elif estado == "jugando":
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
@@ -914,14 +916,24 @@ def main():
                 estado = "game_over"
 
         #Dibujar interaz
+        if nivel_elegido == 0:
+            offset_x = 290
+            offset_y = 165
+        elif nivel_elegido == 1:
+            offset_x = 165
+            offset_y = 165
+        else:
+            offset_x = 95
+            offset_y = 165
+
         if estado == "menu":
             menu.draw()
         elif estado == "jugando" and cocina:
             screen.fill(NEGRO)
-            cocina.draw(screen, offset_x=64, offset_y=64)
+            cocina.draw(screen, offset_x=offset_x, offset_y=offset_y)
         elif estado == "pausa" and cocina:
             screen.fill(NEGRO)
-            cocina.draw(screen, offset_x=64, offset_y=64)
+            cocina.draw(screen, offset_x=offset_x, offset_y=offset_y)
             overlay = pygame.Surface((SCREEN_W, SCREEN_H), pygame.SRCALPHA)
             overlay.fill((0, 0, 0, 160))
             screen.blit(overlay, (0, 0))
